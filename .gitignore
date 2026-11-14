@@ -1,7 +1,7 @@
 # Private things that must never be uploaded
 hermes/
-voice/
-!starter/voice/
+voice/*
+!voice/README.md
 .env
 .env.*
 *.safetensors

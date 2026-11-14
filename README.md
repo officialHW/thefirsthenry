@@ -18,7 +18,56 @@ out loud and answers questions by looking things up in my own files. His brain i
 
 **Not in this repository, on purpose:** the Hermes folder (keys, memory, chat history), my voice recordings and voice model, and any `.env` file. `setup.sh` / `setup.bat` installs Hermes fresh, and `tools/set_key.py` adds your own key.
 
-Built with Claude Code. The rest of this page is the user guide.
+Built with Claude Code.
+
+## Build your own
+
+You can fork this and have your own tiny buddy running in about 20 minutes. He starts with
+my settings and a generic personality, and you then swap in your own body, name and voice.
+
+**You need:** a Mac, Windows or Linux computer with about 3 GB free, Git, and a free Google
+Gemini key from https://aistudio.google.com/apikey (treat it like a password).
+
+1. **Fork** this repository with the Fork button at the top of the page, then clone your fork
+   into a folder **outside** Desktop and Documents (cloud syncing there causes problems):
+
+       git clone https://github.com/<your-username>/thefirsthenry.git
+       cd thefirsthenry
+
+2. **Set up.** This installs Hermes Agent with its official installer (1-2 GB), copies in the
+   starting personality from `hermes-data/`, and asks for your key (typing stays hidden).
+   - Mac or Linux: `bash setup.sh`
+   - Windows: double-click `setup.bat`
+
+3. **Start him.**
+   - In a small window: `start.command` (Mac), `start.bat` (Windows) or `./start.sh` (Linux).
+   - On top of your whole desktop: `start-overlay.command` or `start-overlay.bat` (needs Node.js).
+
+4. **Give him your own body.** The model in `rig/henry-rigged.glb` is my likeness, so please
+   don't use it for your own agent. Either:
+   - delete `rig/henry-rigged.glb` and he becomes **Buddy**, a simple stand-in you can recolour
+     with `rig/tools/make_buddy.py`; or
+   - make a full-body 3D character from your own picture (I used Meshy), give it a skeleton
+     with the usual Mixamo bone names plus an optional `Jaw` bone, and save it as
+     `rig/henry-rigged.glb`. Check it with `rig/demo.html` first. Note that `rig/tools/rig.py`
+     is tuned to the shape of my model, so for a different character use your 3D tool's own
+     rigging, or adjust the numbers in the script.
+
+5. **Make him yours.**
+   - Name and personality: edit `hermes/SOUL.md`. Keep the "Mood and body tags" part, because
+     that is what makes him move.
+   - Your own voice (optional): see `voice/README.md`.
+   - Letting him read your files (optional): see `extras/full-access-SOUL-section.md`. Only do
+     this if you are happy for what he reads to go to your AI service.
+   - A different AI service: see "A different brain" in `starter/README.md`.
+
+6. **Keep your private things private.** The `.gitignore` already leaves out `hermes/` (your key,
+   memory and chats), your voice files and any `.env`. Don't force-add them, and never paste a
+   key into a file that gets uploaded.
+
+Credits and licences for the parts this is built on are in `NOTICE.md`.
+
+## User guide
 
 A tiny 3D Henry who lives on your screen, talks out loud, listens through the mic, shows
 moods, walks around, and remembers things about you. His brain is Hermes Agent.
