@@ -25,8 +25,14 @@ if [ -d hermes-data ]; then
 fi
 
 echo
-echo "Now your Gemini key. Get it from https://aistudio.google.com/apikey or your password manager."
-"$PY" tools/set_key.py
+echo "Now your Gemini key (free from https://aistudio.google.com/apikey)."
+echo "Paste it and press Enter. Nothing shows on screen while you paste: that is on purpose."
+echo "Using a different AI service? Just press Enter here and pick it afterwards (see README, 'Choose his AI service')."
+if ! "$PY" tools/set_key.py; then
+  "$PY" tools/set_key.py --link-only
+  echo "No Gemini key saved. Before starting him, choose an AI service with:"
+  echo "    HERMES_HOME=\"\$PWD/hermes\" hermes/hermes-agent/.hermes/bin/hermes model"
+fi
 
 echo
 if command -v npm >/dev/null; then

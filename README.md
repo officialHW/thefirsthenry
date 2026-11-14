@@ -25,8 +25,8 @@ Built with Claude Code.
 You can fork this and have your own tiny buddy running in about 20 minutes. He starts with
 my settings and a generic personality, and you then swap in your own body, name and voice.
 
-**You need:** a Mac, Windows or Linux computer with about 3 GB free, Git, and a free Google
-Gemini key from https://aistudio.google.com/apikey (treat it like a password).
+**You need:** a Mac, Windows or Linux computer with about 3 GB free, Git, and access to an AI
+service for his brain. You are not tied to one: see "Choose his AI service" below.
 
 1. **Fork** this repository with the Fork button at the top of the page, then clone your fork
    into a folder **outside** Desktop and Documents (cloud syncing there causes problems):
@@ -35,9 +35,15 @@ Gemini key from https://aistudio.google.com/apikey (treat it like a password).
        cd thefirsthenry
 
 2. **Set up.** This installs Hermes Agent with its official installer (1-2 GB), copies in the
-   starting personality from `hermes-data/`, and asks for your key (typing stays hidden).
+   starting personality from `hermes-data/`, and asks for a key.
    - Mac or Linux: `bash setup.sh`
    - Windows: double-click `setup.bat`
+
+   > **When it asks for the key:** paste it and press Enter. **Nothing appears on screen while
+   > you paste, not even dots.** That is on purpose, so nobody can read it over your shoulder.
+   > It has worked if you see "Done: the Gemini key is saved". If you pasted the wrong thing,
+   > run `tools/set_key.py` again. A key is like a password: never put it in a file that gets
+   > uploaded, and never share it.
 
 3. **Start him.**
    - In a small window: `start.command` (Mac), `start.bat` (Windows) or `./start.sh` (Linux).
@@ -61,7 +67,26 @@ Gemini key from https://aistudio.google.com/apikey (treat it like a password).
      this if you are happy for what he reads to go to your AI service.
    - A different AI service: see "A different brain" in `starter/README.md`.
 
-6. **Keep your private things private.** The `.gitignore` already leaves out `hermes/` (your key,
+6. **Choose his AI service.** Hermes Agent works with many language models, free and paid,
+   so use whichever you already have or prefer:
+   - **Free to start:** Google Gemini. Get a key at https://aistudio.google.com/apikey and paste
+     it during set-up. This is what the set-up script asks for by default.
+   - **Paid keys:** OpenAI, Anthropic (Claude) and others. Usage is billed by the provider.
+   - **A subscription you already pay for:** for example a ChatGPT plan, signed in through the
+     browser with `hermes auth add openai-codex --browser`.
+   - **A model running on your own computer:** for example through LM Studio, if your machine
+     is strong enough. Nothing leaves your computer this way.
+
+   To use anything other than Gemini, press Enter without pasting a key during set-up, then
+   run this from the project folder and follow the prompts (Mac or Linux; on Windows run the
+   `hermes` command in the same `hermes\hermes-agent\.hermes\bin` folder):
+
+       HERMES_HOME="$PWD/hermes" hermes/hermes-agent/.hermes/bin/hermes model
+
+   You can run it again any time to switch. Restart him afterwards. Prices, free allowances
+   and model names change often, so check the provider's own page.
+
+7. **Keep your private things private.** The `.gitignore` already leaves out `hermes/` (your key,
    memory and chats), your voice files and any `.env`. Don't force-add them, and never paste a
    key into a file that gets uploaded.
 

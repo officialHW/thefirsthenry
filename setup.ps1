@@ -25,8 +25,14 @@ if (Test-Path "hermes-data") {
 }
 
 Write-Host ""
-Write-Host "Now your Gemini key. Get it from https://aistudio.google.com/apikey or your password manager."
+Write-Host "Now your Gemini key (free from https://aistudio.google.com/apikey)."
+Write-Host "Paste it and press Enter. Nothing shows on screen while you paste: that is on purpose."
+Write-Host "Using a different AI service? Just press Enter here and pick it afterwards (see README, 'Choose his AI service')."
 & $py tools\set_key.py
+if ($LASTEXITCODE -ne 0) {
+    & $py tools\set_key.py --link-only
+    Write-Host "No Gemini key saved. Before starting him, choose an AI service with the 'hermes model' command (see README)."
+}
 
 Write-Host ""
 if (Get-Command npm -ErrorAction SilentlyContinue) {
