@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Henry 3D viewer</title>
+<style>html,body{margin:0;height:100%;background:#2a2a36}canvas{width:100%;height:100%;display:block}</style>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true, preserveDrawingBuffer: true });
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666688, 1.5));
+const cam = new THREE.PerspectiveCamera(20, 1, 0.1, 50); cam.position.set(0, 0, 7.5);
+const g = new THREE.Group(); scene.add(g);
+// four views side by side: front, his-left side, back, top-ish
+new GLTFLoader().load(q.get("m") || "henry-meshy.glb", (m) => {
+  m.scene.traverse(o => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.8; o.frustumCulled = false; } });
+  window.model = m.scene; window.gltf = m; g.add(m.scene); window.ok = true;
+});
+window.yaw = q.has("yaw") ? +q.get("yaw") : 0; window.pitch = 0;
+function f() { const w = innerWidth, h = innerHeight; r.setPixelRatio(1); r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+  g.rotation.set(window.pitch, window.yaw, 0); if (window.tick) window.tick(); r.render(scene, cam); requestAnimationFrame(f); }
+requestAnimationFrame(f);
+window.THREE = THREE; window.scene = scene; window.cam = cam;
+</script>

@@ -1,0 +1,14 @@
+# Private things that must never be uploaded
+hermes/
+voice/
+!starter/voice/
+.env
+.env.*
+*.safetensors
+*.m4a
+*.wav
+*.zip
+memory.json
+node_modules/
+__pycache__/
+.DS_Store

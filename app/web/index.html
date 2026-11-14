@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Henry</title>
+<style>
+  :root { --bg: #14141c; --panel: #1e1e2b; --line: #3a3a52; --text: #e4e6f0; --dim: #9a9db3; --accent: #7aa2ff; --bubble: #ffffff; --bubble-text: #1a1a22; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #eef0f6; --panel: #ffffff; --line: #c9cddd; --text: #1a1a22; --dim: #5d6178; --bubble: #ffffff; --bubble-text: #1a1a22; }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #bubble { position: fixed; bottom: 150px; left: 50%; max-width: min(320px, calc(100vw - 32px)); transform: translateX(-50%);
+    background: var(--bubble); color: var(--bubble-text); border-radius: 14px; padding: 8px 12px; font-size: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 2; }
+  #bubble.show { opacity: 1; }
+  #bar { position: fixed; left: 16px; right: 16px; top: 16px; display: flex; gap: 8px; z-index: 3; max-width: 560px; margin: 0 auto; }
+  #bar input { flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; }
+  #bar button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; cursor: pointer; }
+  #bar button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #status { position: fixed; left: 16px; right: 16px; top: 60px; text-align: center; color: var(--dim); font-size: 13px; z-index: 3; }
+  /* overlay mode: Henry on top of the whole desktop, no background, chat box pops up beside him */
+  html.overlay, html.overlay body { background: transparent; }
+  html.overlay #status { display: none; }
+  html.overlay #mic { display: none; }
+  html.overlay #bar { top: auto; right: auto; width: 250px; margin: 0; opacity: 0; visibility: hidden; transition: opacity .2s, visibility .2s; }
+  html.overlay #bar.show { opacity: 1; visibility: visible; }
+  html.overlay #bar input, html.overlay #bar button { box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+</style>
+<script>
+  window.HENRY_TOKEN = "__HENRY_TOKEN__";
+  window.HENRY_SETTINGS = __HENRY_SETTINGS__;
+  window.HENRY_GFX = window.HENRY_SETTINGS.graphics;
+  window.HENRY_MODEL = window.HENRY_SETTINGS.model || "/rig/henry-rigged.glb";
+</script>
+<script type="importmap">{"imports":{"three":"/rig/vendor/three/three.module.js","three/addons/":"/rig/vendor/three/addons/"}}</script>
+</head>
+<body>
+<form id="bar" autocomplete="off">
+  <input id="msg" placeholder="Talk to Henry…" aria-label="Message to Henry">
+  <button type="button" id="mic" aria-label="Talk with the microphone" title="Hold a conversation by voice">🎤</button>
+  <button id="send">Send</button>
+</form>
+<div id="status" role="status"></div>
+<div id="bubble" aria-live="polite"></div>
+<canvas id="c"></canvas>
+<script type="module" src="/rig/henry.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const S = window.HENRY_SETTINGS;
+  let busy = false, listening = false, rec = null, bubbleTimer = 0;
+
+  // overlay mode: running in the see-through desktop window (overlay/ folder), not a browser
+  const OV = window.henryOverlay && new URLSearchParams(location.search).has("overlay") ? window.henryOverlay : null;
+  if (OV) document.documentElement.classList.add("overlay");
+
+  addEventListener("henry-api", () => { Henry.setSize(Number(S.size) || 110); if (OV) Henry.state.margin = 4; });
+  addEventListener("henry-poke", () => { if (!busy) bubble(["Hehe!", "Hey!", "That tickles!"][Math.floor(Math.random() * 3)], 1400); });
+
+  function status(t) {
+    $("status").textContent = t || "";
+    if (OV && t) bubble(t, 60000);          // no status line on the desktop: Henry's bubble says it
+  }
+  function bubble(t, ms) {
+    const b = $("bubble"); b.textContent = t; b.classList.add("show");
+    clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => b.classList.remove("show"), ms || 6000);
+  }
+  // keep the speech bubble above Henry (and in overlay mode the chat box beside him) as he walks
+  (function follow() {
+    if (window.Henry) {
+      const st = Henry.state, hx = innerWidth / 2 + st.x;
+      $("bubble").style.left = hx + "px";
+      $("bubble").style.bottom = (st.margin + st.y + st.size * 1.05) + "px";
+      if (OV) {
+        const bar = $("bar"), bw = bar.offsetWidth || 250, gap = st.size * 0.45;
+        const left = hx + gap + bw < innerWidth - 8 ? hx + gap : hx - gap - bw;   // right of him, or left near the edge
+        bar.style.left = Math.max(8, left) + "px";
+        bar.style.bottom = Math.min(innerHeight - 50, st.margin + st.y + st.size * 0.35) + "px";
+      }
+    }
+    requestAnimationFrame(follow);
+  })();
+
+  // overlay mode: clicks go through to your desktop except on Henry and his chat box.
+  // The chat box shows while your pointer is on him (or it), while you type, and for a moment after.
+  if (OV) {
+    let inter = null, hideAt = 0;
+    const onHenry = (x, y) => {
+      if (!window.Henry) return false;
+      const st = Henry.state, feet = innerHeight - st.margin - st.y;
+      return st.drag || (Math.abs(x - (innerWidth / 2 + st.x)) < st.size * 0.45 && y < feet + 8 && y > feet - st.size * 1.1);
+    };
+    const inBox = (x, y) => {
+      if (!$("bar").classList.contains("show")) return false;
+      const r = $("bar").getBoundingClientRect();
+      return x > r.left - 10 && x < r.right + 10 && y > r.top - 10 && y < r.bottom + 10;
+    };
+    const showBar = () => { $("bar").classList.add("show"); hideAt = performance.now() + 2500; };
+    addEventListener("mousemove", (e) => {
+      const hit = onHenry(e.clientX, e.clientY), box = inBox(e.clientX, e.clientY);
+      if (hit) showBar();
+      if (box) hideAt = performance.now() + 2500;
+      const want = !!(hit || box);
+      if (want !== inter) { inter = want; OV.setInteractive(want); }
+    });
+    setInterval(() => {   // tuck the chat box away when you've moved on and aren't typing
+      const typing = document.activeElement === $("msg") && $("msg").value;
+      if (performance.now() > hideAt && !typing && !busy) {
+        $("bar").classList.remove("show");
+        if (document.activeElement === $("msg")) $("msg").blur();
+      }
+    }, 500);
+    $("msg").addEventListener("focus", showBar);
+    $("msg").addEventListener("input", showBar);
+    OV.onFocusChat(() => { showBar(); hideAt = performance.now() + 8000; $("msg").focus(); });
+  }
+
+  // --- your own voice (Pocket TTS on the Mac): streamed, started early, jaw follows the loudness ---
+  let actx = null, playing = [], voiceRun = 0;
+  function audio() {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    if (!actx) actx = new C();
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  addEventListener("pointerdown", audio);   // phones only allow sound after a tap or key press
+  addEventListener("keydown", audio);
+  function stopMine() {
+    voiceRun++;
+    if (window.Henry) Henry.state.realMouth = false;
+    for (const s of playing) { try { s.stop(); } catch {} }
+    playing = [];
+    if (window.Henry) { Henry.setMouth(0); Henry.state.speaking = false; }
+  }
+  // returns true once it has said the text in your voice, false if it couldn't (then the computer voice is used)
+  async function speakMine(text) {
+    const ctx = audio(); if (!ctx || !S.myvoice) return false;
+    stopMine(); const run = voiceRun;
+    let r;
+    try {
+      r = await fetch("/api/speak", { method: "POST",
+        headers: { "Content-Type": "application/json", "X-Henry-Token": window.HENRY_TOKEN },
+        body: JSON.stringify({ text }) });
+    } catch { return false; }
+    if (!r.ok || !r.body) return false;
+    const reader = r.body.getReader();
+    let raw = new Uint8Array(0), rate = 24000, dataAt = -1, odd = null;
+    let waiting = [], waitingSec = 0, started = false, nextT = 0, got = 0;
+    const levels = [];
+    const need = Math.max(1.2, text.length / 14 * (S.voicelead || 0.35));   // seconds to collect before starting
+    const play = (f) => {
+      const b = ctx.createBuffer(1, f.length, rate); b.getChannelData(0).set(f);
+      const s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination);
+      if (nextT < ctx.currentTime + 0.03) nextT = ctx.currentTime + 0.06;
+      s.start(nextT); playing.push(s);
+      const step = Math.floor(rate * 0.03);
+      for (let i = 0; i < f.length; i += step) {
+        let sum = 0; const e = Math.min(f.length, i + step);
+        for (let j = i; j < e; j++) sum += f[j] * f[j];
+        levels.push([nextT + i / rate, Math.sqrt(sum / (e - i))]);
+      }
+      nextT += f.length / rate;
+    };
+    const take = (f) => {
+      got += f.length;
+      if (started) return play(f);
+      waiting.push(f); waitingSec += f.length / rate;
+      if (waitingSec >= need) { started = true; waiting.forEach(play); waiting = []; }
+    };
+    // mouth: follow the loudness of what is playing right now
+    let li = 0, fin = false;
+    Henry.state.realMouth = true;            // jaw follows the real sound, not the made-up pattern
+    const mouth = () => {
+      if (run !== voiceRun || fin) return;
+      const t = ctx.currentTime;
+      while (li + 1 < levels.length && levels[li + 1][0] <= t) li++;
+      const on = started && t < nextT;
+      Henry.state.speaking = on;
+      Henry.setMouth(on && levels[li] ? Math.min(1, levels[li][1] * 5) : 0);
+      requestAnimationFrame(mouth);
+    };
+    requestAnimationFrame(mouth);
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (run !== voiceRun) { reader.cancel(); return true; }
+        if (done) break;
+        const m = new Uint8Array(raw.length + value.length); m.set(raw); m.set(value, raw.length); raw = m;
+        if (dataAt < 0) {                    // read the WAV header: sample rate, then where the sound starts
+          for (let i = 12; i + 8 <= raw.length; i++) {
+            if (raw[i] === 100 && raw[i + 1] === 97 && raw[i + 2] === 116 && raw[i + 3] === 97) { dataAt = i + 8; break; }
+          }
+          if (dataAt < 0) continue;
+          rate = new DataView(raw.buffer).getUint32(24, true) || 24000;
+          raw = raw.slice(dataAt);
+        }
+        const n = raw.length & ~1, dv = new DataView(raw.buffer, raw.byteOffset, n), f = new Float32Array(n / 2);
+        for (let i = 0; i < f.length; i++) f[i] = dv.getInt16(i * 2, true) / 32768;
+        raw = raw.slice(n);
+        if (f.length) take(f);
+      }
+    } catch { if (!got) { fin = true; Henry.state.realMouth = false; return false; } }
+    if (!got) { fin = true; Henry.state.realMouth = false; return false; }
+    if (!started) { started = true; waiting.forEach(play); waiting = []; }
+    await new Promise((res) => { const w = () => (run !== voiceRun || ctx.currentTime >= nextT) ? res() : setTimeout(w, 100); w(); });
+    fin = true; Henry.state.realMouth = false;
+    if (run === voiceRun) { Henry.setMouth(0); Henry.state.speaking = false; }
+    return true;
+  }
+
+  async function send(text) {
+    text = (text || "").trim();
+    if (!text || busy) return;
+    busy = true; status("Henry is thinking…");
+    if (window.Henry) { Henry.hush(); stopMine(); Henry.setMood("thinking"); }
+    try {
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Henry-Token": window.HENRY_TOKEN },
+        body: JSON.stringify({ text }),
+      });
+      const d = await r.json();
+      if (!r.ok) { Henry.setMood(d.mood || "confused"); bubble(d.error || "Something went wrong.", 8000); status(""); return; }
+      Henry.setMood(d.mood);
+      for (const a of d.actions || []) {
+        if (a.do === "wave") Henry.wave();
+        if (a.do === "comehere") Henry.comeHere();
+        if (a.do === "walk") Henry.walkTo(a.to);
+      }
+      status("");
+      bubble(d.say, Math.max(4000, d.say.length * 70));
+      stopMic();
+      if (!(await speakMine(d.say))) await Henry.speak(d.say, S.voice);
+      if (listening) startMic();
+    } catch (e) {
+      Henry.setMood("confused"); bubble("I can't reach my helper program. Is it still running?", 8000); status("");
+    } finally { busy = false; }
+  }
+
+  $("bar").addEventListener("submit", (e) => { e.preventDefault(); const t = $("msg").value; $("msg").value = ""; send(t); });
+
+  // --- microphone (the browser's own speech recognition) ---
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function startMic() {
+    if (!SR || rec) return;
+    rec = new SR(); rec.lang = navigator.language || "en-GB"; rec.interimResults = false; rec.continuous = false;
+    rec.onresult = (e) => { const t = e.results[0][0].transcript; bubble("“" + t + "”", 3000); send(t); };
+    rec.onend = () => { rec = null; if (listening && !busy && !(window.Henry && Henry.state.speaking)) startMic(); };
+    rec.onerror = (e) => { if (e.error === "not-allowed") { listening = false; $("mic").classList.remove("on"); status("Microphone access was blocked. Allow it in the browser's address bar."); } };
+    try { rec.start(); } catch { rec = null; }
+  }
+  function stopMic() { if (rec) { const r = rec; rec = null; r.onend = null; try { r.stop(); } catch {} } }
+  $("mic").addEventListener("click", () => {
+    if (!SR) { status("This browser can't listen. Try Chrome, Edge or Safari."); return; }
+    listening = !listening; $("mic").classList.toggle("on", listening);
+    if (listening) { status("Listening… just talk."); startMic(); } else { status(""); stopMic(); }
+  });
+})();
+</script>
+</body>
+</html>

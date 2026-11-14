@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny Henry</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14141c; color: #cfd2e0; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .bar { position: fixed; left: 16px; top: 16px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 2; }
+  button, select { background: #262636; color: inherit; border: 1px solid #3a3a52; border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #30304a; }
+</style>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+<div class="bar">
+  <button onclick="Henry.walkTo(-1)">Walk left</button>
+  <button onclick="Henry.walkTo(1)">Walk right</button>
+  <button onclick="Henry.wave()">Wave</button>
+  <button onclick="Henry.say(3000)">Talk</button>
+  <button onclick="Henry.setSize(Henry.size > 150 ? 110 : 320)">Thumb / big</button>
+  <select id="mood" onchange="Henry.setMood(this.value)" aria-label="Mood"></select>
+  <form onsubmit="Henry.speak(this.t.value); return false" style="display:flex;gap:8px">
+    <input name="t" value="Hi, I'm Henry. Nice to meet you." aria-label="Something to say" style="width:240px;background:#1c1c28;color:inherit;border:1px solid #3a3a52;border-radius:8px;padding:6px 10px;font:inherit">
+    <button>Say it</button>
+  </form>
+</div>
+<canvas id="c"></canvas>
+<script>
+  // demo.html?m=buddy.glb tries another body from this folder
+  const m = new URLSearchParams(location.search).get("m");
+  if (m && /^[\w.-]+\.glb$/.test(m)) window.HENRY_MODEL = m;
+  addEventListener("henry-api", () => { const m = document.getElementById("mood"); for (const n of Henry.moods) m.add(new Option(n, n)); });
+</script>
+<script type="module" src="henry.js"></script>

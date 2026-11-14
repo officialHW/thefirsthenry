@@ -1,0 +1,12 @@
+{
+  "name": "henry-overlay",
+  "private": true,
+  "description": "Henry on top of the whole desktop: a see-through, always-on-top window.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "45.0.0"
+  }
+}

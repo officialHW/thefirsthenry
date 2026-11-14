@@ -1,0 +1,11 @@
+{
+  "graphics": "low",
+  "size": 110,
+  "voice": "",
+  "port": 4750,
+  "hermes_url": "http://127.0.0.1:8642",
+  "session": "henry",
+  "my_voice": true,
+  "voice_model": "english_7m_2026-10",
+  "voice_file": "voice/my-voice-short.safetensors"
+}
