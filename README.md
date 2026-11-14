@@ -20,6 +20,9 @@ out loud and answers questions by looking things up in my own files. His brain i
 
 Built with Claude Code.
 
+**About the commit history:** you won't find many commits here. I worked on this on my own
+computer until it reached a stage I was comfortable with, and only then committed it.
+
 ## Build your own
 
 You can fork this and have your own tiny buddy running in about 20 minutes. He starts with
