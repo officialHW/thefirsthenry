@@ -56,7 +56,13 @@
   const OV = window.henryOverlay && new URLSearchParams(location.search).has("overlay") ? window.henryOverlay : null;
   if (OV) document.documentElement.classList.add("overlay");
 
-  addEventListener("henry-api", () => { Henry.setSize(Number(S.size) || 110); if (OV) Henry.state.margin = 4; });
+  let exits = [false, false];              // overlay mode: is there another screen to his left / right
+  addEventListener("henry-api", () => { Henry.setSize(Number(S.size) || 110); if (OV) { Henry.state.margin = 4; Henry.setExits(...exits); } });
+  if (OV) {
+    OV.onExits((l, r) => { exits = [l, r]; if (window.Henry) Henry.setExits(l, r); });
+    OV.onArrived((side) => window.Henry && Henry.arrive(side));
+    addEventListener("henry-cross", (e) => OV.cross(e.detail));
+  }
   addEventListener("henry-poke", () => { if (!busy) bubble(["Hehe!", "Hey!", "That tickles!"][Math.floor(Math.random() * 3)], 1400); });
 
   function status(t) {

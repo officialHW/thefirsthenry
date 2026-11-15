@@ -37,6 +37,8 @@ const st = {
   lookT: { x: 0, y: 0 }, cur: { x: -1e4, y: -1e4, v: 0, t: 0 }, mouseIn: false, lastInput: 0,
   reacts: [], hover: 0, waveCool: 0, scareCool: 0, hopStart: 0, hopUntil: 0, drowsy: 0,
   yawnStart: 0, yawnUntil: 0, nextYawn: 0, away: 0,
+  // other screens: which sides have one, which way he is heading off (-1 left, 1 right), and when he left
+  exits: { l: false, r: false }, crossing: 0, gone: 0,
 };
 st.lastInput = performance.now();
 
@@ -102,6 +104,22 @@ const range = () => Math.max(0, innerWidth / 2 - st.size * 0.6);
 const lo = () => st.home === null ? -range() : Math.max(-range(), st.home - st.size * 1.5);
 const hi = () => st.home === null ? range() : Math.min(range(), st.home + st.size * 1.5);
 const maxY = () => Math.max(0, innerHeight - st.margin - st.size * 1.15);
+const off = () => innerWidth / 2 + st.size * 0.7;      // just out of sight past the edge
+// walk off one side towards the screen next door (the desktop overlay moves his window there)
+function cross(side) {
+  if (!(side < 0 ? st.exits.l : st.exits.r) || st.crossing || st.drag) return false;
+  st.home = null; st.crossing = side; st.to = side * off(); st.next = performance.now() + 20000;
+  return true;
+}
+// he comes in from the edge opposite the way he was walking
+function arrive(side) {
+  resizeT = performance.now() + 2500;
+  setTimeout(() => {
+    st.x = -side * off(); st.to = -side * range() * (0.1 + Math.random() * 0.7);
+    st.dir = side; st.crossing = 0; st.gone = 0; mover.visible = true;
+    st.next = performance.now() + 8000;
+  }, 250);
+}
 
 let last = performance.now();
 const FRAME_MS = HIGH ? 0 : 1000 / 30 - 2;   // low graphics draws about 30 times a second
@@ -151,9 +169,13 @@ function frame(t) {
   if (!st.next) st.next = t + 2500;
   if (t > st.next && st.amt < 0.02 && t > st.waveUntil && t > st.talkUntil && !st.speaking && !st.drag && st.drowsy < 0.4 && !near) {
     st.to = lo() + Math.random() * (hi() - lo()); st.next = t + 5000 + Math.random() * 7000;
+    const sides = [st.exits.l && -1, st.exits.r && 1].filter(Boolean);       // now and then he visits another screen
+    if (st.home === null && sides.length && Math.random() < 0.3) cross(sides[Math.floor(Math.random() * sides.length)]);
   }
   if (st.drag) st.to = st.x;
-  st.to = Math.max(-range(), Math.min(range(), st.to));
+  if (st.crossing && !st.gone && st.to !== st.crossing * off()) st.crossing = 0;   // something stopped him: he stays
+  if (st.gone && t - st.gone > 3000) arrive(-st.crossing), st.gone = t;           // nobody moved the window: come back in
+  if (!st.crossing) st.to = Math.max(-range(), Math.min(range(), st.to));
   st.y = Math.max(0, Math.min(maxY(), st.y));
   st.dangle = lerp(st.dangle, st.drag ? 1 : 0, sec * 10);
   const dx = st.to - st.x, moving = Math.abs(dx) > 1;
@@ -162,6 +184,10 @@ function frame(t) {
   st.amt = lerp(st.amt, moving && turned ? 1 : 0, sec * 5);
   const step = moving ? st.dir * Math.min(Math.abs(dx), st.size * 0.55 * st.amt * sec) : 0;
   st.x += step;
+  if (st.crossing && !st.gone && Math.abs(st.x - st.to) <= 1) {      // out of sight: ask for the next screen
+    st.gone = t; mover.visible = false; resizeT = t + 2500;
+    window.dispatchEvent(new CustomEvent("henry-cross", { detail: st.crossing }));
+  }
   st.ph += Math.abs(step) / (st.size * 0.30) * Math.PI * 2;      // steps match distance, so feet don't slide
   st.face = lerp(st.face, moving ? st.dir * 1.25 : st.look.x * 0.5, sec * 7);   // turns his body toward you too
 
@@ -296,6 +322,7 @@ function drop() {
     window.dispatchEvent(new Event("henry-poke"));
   }
   st.next = performance.now() + 8000; canvas.style.cursor = "";
+  if (!poke && Math.abs(st.x) >= range() - 2) cross(Math.sign(st.x));   // put down against an edge: he carries on to the next screen
   window.dispatchEvent(new Event("henry-drop"));
 }
 addEventListener("pointerup", drop);
@@ -314,6 +341,8 @@ window.Henry = {
   comeHere() { st.home = null; st.y = 0; st.to = 0; st.next = performance.now() + 8000; },   // back to the floor, middle
   placeAt(x, y) { st.x = st.to = st.home = x; st.y = y; },   // x from the middle, y above the floor, in pixels
   freeRoam() { st.home = null; },                            // wander the whole width again
+  setExits(l, r) { st.exits.l = !!l; st.exits.r = !!r; },    // is there another screen to the left / right
+  cross, arrive,                                             // cross(-1 | 1): walk off to the screen on that side
   // says the text out loud with the browser's own voice; his jaw and hands move until it ends
   speak(text, voiceName) {
     return new Promise((done) => {
